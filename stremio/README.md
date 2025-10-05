@@ -1,7 +1,12 @@
-## Configuring the default WEB UI settings
+# Stremio server
 
-<!-- Your webui should be a link to webui, defined at the bottom of the README -->
-Go to [your webui][webui]
+This module allow you to run a stremio service and stremio Web UI.
+It is based on [stremio docker from tsaridas][stremio-docker].
+
+## Importing/configuring the default Web UI settings
+
+Stremio's web app stores settings in the browser's local storage. You can pre-configure these settings by editing the `localStorage` option.
+To import your actual from [Stremio Web][stremio-web] or [your Web UI][webui], open the developper tools and type in the console the following code to copy your configuration in your clipboard.
 
 ```js
 let res = {}
@@ -17,7 +22,12 @@ for (let i = 0; i < localStorage.length; i++) {
     res[key] = value;
   }
 }
-copy(res)
+copy(JSON.stringify(res))
 ```
+Then paste this into the `localStorage` option.
+Now, all the devices accessing [your Web UI][webui] for the first time should have all settings configured identically (account and Trakt included).
 
+
+[stremio-docker]: https://github.com/tsaridas/stremio-docker/
+[stremio-web]: https://web.stremio.com/
 [webui]: https://homeassistant.local:8080/
