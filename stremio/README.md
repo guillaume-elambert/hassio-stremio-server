@@ -24,7 +24,7 @@ for (let i = 0; i < localStorage.length; i++) {
 }
 copy(JSON.stringify(res))
 ```
-Then paste this into the `localStorage` option.
+Then paste your clipboard content into the `localStorage` option.
 Now, all the devices accessing [your Web UI][webui] for the first time should have all settings configured identically (account and Trakt included).
 
 
