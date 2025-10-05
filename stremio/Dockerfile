@@ -37,7 +37,7 @@ RUN chmod +x /srv/stremio-server/run.sh
 WORKDIR /srv/stremio-server
 
 # Expose ports (already exposed in base, but documenting)
-EXPOSE 8080 11470 12470
+EXPOSE 8080
 
 # Use our custom startup script instead of the default
 ENTRYPOINT []

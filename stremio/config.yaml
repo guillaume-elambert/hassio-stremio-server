@@ -18,7 +18,7 @@ options:
   no_cors: true
   casting_disabled: false
   webui_location: ""
-  webui_internal_port: 8090
+  # webui_internal_port: 8080
   ffmpeg_bin: ""
   ffprobe_bin: ""
   app_path: ""
@@ -49,14 +49,12 @@ schema:
   localStorage: str
 
 ports:
-  11470/tcp: 11470
-  12470/tcp: 12470
-  8090/tcp: 8090
+  8080/tcp: 8080
 
 ports_description:
-  11470/tcp: Stremio server HTTP port
-  12470/tcp: Stremio server HTTPS port
-  8090/tcp: Stremio Web UI port
+  # 11470/tcp: Stremio server HTTP port
+  # 12470/tcp: Stremio server HTTPS port
+  8080/tcp: Stremio Web UI port
 
 # Hardware acceleration configuration (matches Plex addon)
 devices:
