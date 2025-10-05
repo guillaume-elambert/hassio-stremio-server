@@ -1,0 +1,85 @@
+---
+configuration:
+  web_ui_protocol:
+    name: Web UI Protocol
+    description: >
+      Protocol for accessing the Stremio Web UI. Can be either 'http' or 'https'.
+  image_version:
+    name: Image Version
+    description: >
+      Version of the Stremio Docker image to use, see https://hub.docker.com/r/tsaridas/stremio-docker/tags for available versions.
+  ipaddress:
+    name: IP Address
+    description: >
+      Set this to a valid IPv4 in order to enable https and generate certificates with stremio domain. 
+      If you set this to 0.0.0.0 it will try to automatically get your public ip. Getting the public ip and DNS is not reliable and might need multiple retries. It will not work for IPv6.
+  server_url:
+    name: Server URL
+    description: Manually sets the streaming server URL. This is useful when you want to force a specific URL.
+  auto_server_url:
+    name: Auto Server URL
+    description: >
+      When set to 1, the streaming server URL is automatically detected from the browser's URL.
+      This is the recommended setting for most users.
+  no_cors:
+    name: No CORS
+    description: >
+      Set to disable server's cors.
+  casting_disabled:
+    name: Casting Disabled
+    description: >
+      Set to disable casting.
+      You should set this to 1 if you're getting SSDP errors in the logs.
+  webui_location:
+    name: WebUI Location
+    description: >
+      Sets the redirect page for web player and automatically sets up streaming server for you when one tries to access server at port 11470 or 12470.
+      Default is https://app.strem.io/shell-v4.4/.
+  webui_internal_port:
+    name: WebUI Internal Port
+    description: >
+      Sets the port inside the docker container for the web player.
+  ffmpeg_bin:
+    name: FFMPEG Bin
+    description: >
+      Set for custom ffmpeg bin path.
+  ffprobe_bin:
+    name: FFPROBE Bin
+    description: >
+      Set for custom ffprobe bin path.
+  app_path:
+    name: App Path
+    description: >
+      Set for custom path for stremio server.
+      Server will always save cache to /root/.stremio-server though so it's only for its config files.
+  domain:
+    name: Domain
+    description: >
+      Set for custom domain for stremio server.
+      Server will use the specified domain for the web player and streaming server.
+      This should match the certificate and cannot be applied without specifying CERT_FILE.
+  cert_file:
+    name: Certificate File
+    description: >
+      Set for custom certificate path.
+      The server and web player will load the specified certificate.
+  username:
+    name: Username
+    description: Set for custom username for http simple authentication.
+  password:
+    name: Password
+    description: >
+      Set for custom password for http simple authentication.
+  disable_caching:
+    name: Disable Caching
+    description: >
+      Disable caching for server if set to 1.
+  localStorage:
+    name: Default Web UI Local Storage
+    description: >
+      Set the default localStorage for the web UI. Useful for pre-configuring certain settings or addons.
+      For more information, see https://github.com/tsaridas/stremio-docker/pull/59.
+network:
+  11470/tcp: Stremio server HTTP port
+  12470/tcp: Stremio server HTTPS port
+  8080/tcp: Stremio Web UI port
