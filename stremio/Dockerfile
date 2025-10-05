@@ -27,7 +27,7 @@ RUN if [ "$(uname -m)" = "x86_64" ]; then \
 
 # Ensure video group exists and add root user to it
 RUN addgroup -g 44 video 2>/dev/null || true && \
-    adduser root video 2>/dev/null || truee
+    adduser root video 2>/dev/null || true
 
 # Copy custom startup script
 COPY ./run.sh /srv/stremio-server/run.sh
