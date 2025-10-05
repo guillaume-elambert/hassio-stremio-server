@@ -1,0 +1,5 @@
+{
+  "name": "Home Assistant Add-on: Stremio server",
+  "url": "https://github.com/guillaume-elambert/hassio-stremio-server",
+  "maintainer": "Guillaume Elambert <contact@elambert-guillau.me>"
+}
