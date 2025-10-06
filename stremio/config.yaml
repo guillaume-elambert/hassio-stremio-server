@@ -13,12 +13,10 @@ webui: "[PROTO:web_ui_protocol]://[HOST]:[PORT:8080]/"
 options:
   web_ui_protocol: https
   ipaddress: "0.0.0.0"
-  server_url: "https://homeassistant.local:12470/"
-  auto_server_url: false
+  auto_server_url: true
   no_cors: true
   casting_disabled: false
   webui_location: ""
-  # webui_internal_port: 8080
   ffmpeg_bin: ""
   ffprobe_bin: ""
   app_path: ""
@@ -32,7 +30,7 @@ options:
 schema:
   web_ui_protocol: list(http|https)
   ipaddress: str
-  server_url: str
+  server_url: str?
   auto_server_url: bool
   no_cors: bool
   casting_disabled: bool
