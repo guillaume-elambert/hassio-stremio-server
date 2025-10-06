@@ -37,7 +37,7 @@ schema:
   no_cors: bool
   casting_disabled: bool
   webui_location: str
-  webui_internal_port: int
+  webui_internal_port: int?
   ffmpeg_bin: str
   ffprobe_bin: str
   app_path: str
