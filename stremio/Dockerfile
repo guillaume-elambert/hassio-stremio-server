@@ -36,6 +36,9 @@ RUN chmod +x /srv/stremio-server/run.sh
 # Set working directory
 WORKDIR /srv/stremio-server
 
+# Fix self certificate when node calling it self with https and not localhost url
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+
 # Expose ports (already exposed in base, but documenting)
 EXPOSE 8080
 
