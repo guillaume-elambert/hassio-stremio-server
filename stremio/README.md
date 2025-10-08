@@ -28,6 +28,25 @@ Then paste your clipboard content into the `localStorage` option.
 Now, all the devices accessing [your Web UI][webui] for the first time should have all settings configured identically (account and Trakt included).
 
 
+## VPN setup
+
+This addon supports routing internet traffic through an OpenVPN connection while maintaining local network access. This is useful for privacy or accessing geo-restricted content.
+You need an OpenVPN configuration file from your VPN provider. Most providers (NordVPN, ExpressVPN, ProtonVPN, etc.) provide .ovpn files.
+
+```sh
+# 1. Create VPN directory
+mkdir -p /addon_configs/stremio_server/vpn
+
+# 2. Copy VPN config
+cp your-vpn.ovpn /addon_configs/stremio_server/vpn/vpn.ovpn
+
+# 3. (Optional) Add credentials
+echo "username" > /addon_configs/stremio_server/vpn/auth.txt
+echo "password" >> /addon_configs/stremio_server/vpn/auth.txt
+
+# 4. Restart addon
+```
+
 [stremio-docker]: https://github.com/tsaridas/stremio-docker/
 [stremio-web]: https://web.stremio.com/
 [webui]: https://homeassistant.local:8080/

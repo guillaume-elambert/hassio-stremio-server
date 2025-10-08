@@ -13,7 +13,11 @@ FROM tsaridas/stremio-docker:${IMAGE_VERSION} as final
 # The base image already has libva, we need to add drivers and utils
 RUN apk add --no-cache \
     bash \
-    jq
+    jq \
+    openvpn \
+    iproute2
+    # avahi \
+    # avahi-compat-libdns_sd
 
 # Add Intel media driver only for x86_64 (already done in base but ensuring latest)
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
@@ -29,9 +33,20 @@ RUN if [ "$(uname -m)" = "x86_64" ]; then \
 RUN addgroup -g 44 video 2>/dev/null || true && \
     adduser root video 2>/dev/null || true
 
+# Copy VPN setup script
+COPY ./vpn-setup.sh /usr/local/bin/vpn-setup.sh
+RUN chmod +x /usr/local/bin/vpn-setup.sh
+
+# Copy VPN run script
+COPY ./vpn-up.sh /usr/local/bin/vpn-up
+RUN chmod +x /usr/local/bin/vpn-up
+
 # Copy custom startup script
 COPY ./run.sh /srv/stremio-server/run.sh
 RUN chmod +x /srv/stremio-server/run.sh
+
+# Clear cache
+RUN rm -rf /var/cache/apk/* && rm -rf /tmp/*
 
 # Set working directory
 WORKDIR /srv/stremio-server

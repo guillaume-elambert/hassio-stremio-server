@@ -3,7 +3,15 @@ set -e
 
 CONFIG_PATH=/data/options.json
 LOCAL_STORAGE_PATH=./localStorage.json
-EXCLUDE_OPTIONS=("localStorage" "device")
+EXCLUDE_OPTIONS=("localStorage" "device" "local_network" "vpn_config_filename")
+
+# Setup VPN first (if configured)
+source /usr/local/bin/vpn-setup.sh
+
+echo ""
+echo "=================================="
+echo "Loading Stremio Configuration"
+echo "=================================="
 
 # Function to check if element is in array
 in_array() {
@@ -12,6 +20,7 @@ in_array() {
     return 1
 }
 
+# Export configuration options as environment variables
 for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
     # Skip empty options
     [[ -z "$opt" ]] && continue
@@ -26,7 +35,6 @@ for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
         # Escape double quotes in value
         safe_value="${value//\"/\\\"}"
         export "${opt^^}"="$safe_value"
-        echo "Exported ${opt^^}=$safe_value"
     fi
 done
 
@@ -34,9 +42,13 @@ done
 LOCAL_STORAGE=$(jq -r '.localStorage // empty' "$CONFIG_PATH")
 if [[ -n "$LOCAL_STORAGE" ]]; then
     echo "$LOCAL_STORAGE" > "$LOCAL_STORAGE_PATH"
-    echo "Wrote localStorage to $LOCAL_STORAGE_PATH"
+    echo "  ✓ localStorage configuration saved"
 fi
 
-ls -la /dev/dri
+echo ""
+echo "=================================="
+echo "Starting Stremio Server"
+echo "=================================="
 
+# Start Stremio
 exec ./stremio-web-service-run.sh
