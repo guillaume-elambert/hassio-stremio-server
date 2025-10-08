@@ -15,7 +15,7 @@ POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "vpn.ovpn" "vpn.conf")
 
 # Check if one of VPN config exists
 for FILE in "${POSSIBLE_FILES[@]}"; do
-    if [ -f "$VPN_CONFIG_DIR/$FILE" ]; then
+    if [ -n "$FILE" ] && [ -f "$VPN_CONFIG_DIR/$FILE" ]; then
         VPN_CONFIG="$VPN_CONFIG_DIR/$FILE"
         break
     fi
@@ -24,7 +24,7 @@ done
 # Exit if no config found
 if [ -z "$VPN_CONFIG" ]; then
     echo "ℹ  No VPN configuration found - skipping VPN setup"
-    return 0
+    exit 0
 fi
 
 echo "ℹ VPN config found: $VPN_CONFIG"
@@ -36,7 +36,7 @@ AUTO_DETECT_NETWORK() {
     
     if [ -z "$DEFAULT_IFACE" ]; then
         echo "⚠ Could not detect default network interface"
-        return 1
+        exit 1
     fi
     
     # Get IP and netmask of default interface
@@ -44,7 +44,7 @@ AUTO_DETECT_NETWORK() {
     
     if [ -z "$LOCAL_IP" ]; then
         echo "⚠ Could not detect local IP"
-        return 1
+        exit 1
     fi
     
     echo "$LOCAL_IP"
@@ -92,22 +92,18 @@ if [ -f "$VPN_CONFIG_DIR/auth.txt" ]; then
 fi
 
 # Configure OpenVPN for split tunneling
-if ! grep -q "route-nopull" /etc/openvpn/client.conf; then
-    echo "route-nopull" >> /etc/openvpn/client.conf
-fi
+# if ! grep -q "route-nopull" /etc/openvpn/client.conf; then
+#     echo "route-nopull" >> /etc/openvpn/client.conf
+# fi
 
-if ! grep -q "script-security 2" /etc/openvpn/client.conf; then
-    echo "script-security 2" >> /etc/openvpn/client.conf
-fi
+# if ! grep -q "script-security 2" /etc/openvpn/client.conf; then
+#     echo "script-security 2" >> /etc/openvpn/client.conf
+# fi
 
-if ! grep -q "route-up" /etc/openvpn/client.conf; then
-    echo "route-up /usr/local/bin/vpn-up" >> /etc/openvpn/client.conf
-fi
-
-# Prevent DNS changes
-if ! grep -q "pull-filter ignore \"dhcp-option DNS\"" /etc/openvpn/client.conf; then
-    echo "pull-filter ignore \"dhcp-option DNS\"" >> /etc/openvpn/client.conf
-fi
+# # Prevent DNS changes
+# if ! grep -q "pull-filter ignore \"dhcp-option DNS\"" /etc/openvpn/client.conf; then
+#     echo "pull-filter ignore \"dhcp-option DNS\"" >> /etc/openvpn/client.conf
+# fi
 
 # Start OpenVPN
 echo "→ Starting OpenVPN..."
@@ -119,21 +115,23 @@ for i in {1..30}; do
     sleep 1
     echo -n "."
     
-    if ip link show tun0 >/dev/null 2>&1; then
+    TUN_IFACE=$(ip -o link show | awk -F': ' '/tun[0-9]+/ {print $2}' | head -n1)
+    if [ -n "$TUN_IFACE" ]; then
         echo ""
         echo "✓ VPN connection established!"
         
         # Get VPN IP
-        VPN_IP=$(ip addr show tun0 | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)
+        VPN_IP=$(ip addr show "$TUN_IFACE" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)
         echo "  VPN IP: $VPN_IP"
         
         # Get public IP
         PUBLIC_IP=$(timeout 5 curl -s ifconfig.me 2>/dev/null || echo "unknown")
         echo "  Public IP: $PUBLIC_IP"
     
-        return 0
+        exit 0
     fi
 done
 
+echo ""
 echo "✗ VPN connection timeout - continuing without VPN"
-return 1
+exit 1

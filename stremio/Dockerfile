@@ -34,12 +34,8 @@ RUN addgroup -g 44 video 2>/dev/null || true && \
     adduser root video 2>/dev/null || true
 
 # Copy VPN setup script
-COPY ./vpn-setup.sh /usr/local/bin/vpn-setup.sh
-RUN chmod +x /usr/local/bin/vpn-setup.sh
-
-# Copy VPN run script
-COPY ./vpn-up.sh /usr/local/bin/vpn-up
-RUN chmod +x /usr/local/bin/vpn-up
+COPY ./vpn-setup.sh /usr/local/bin/vpn-setup
+RUN chmod +x /usr/local/bin/vpn-setup
 
 # Copy custom startup script
 COPY ./run.sh /srv/stremio-server/run.sh

@@ -10,6 +10,7 @@ arch:
   - armv7
 startup: services
 webui: "[PROTO:web_ui_protocol]://[HOST]:[PORT:8080]/"
+host_network: true
 
 options:
   web_ui_protocol: https

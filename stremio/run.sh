@@ -5,8 +5,16 @@ CONFIG_PATH=/data/options.json
 LOCAL_STORAGE_PATH=./localStorage.json
 EXCLUDE_OPTIONS=("localStorage" "device" "local_network" "vpn_config_filename")
 
-# Setup VPN first (if configured)
-source /usr/local/bin/vpn-setup.sh
+ip route show
+
+# Setup VPN - catch any failures
+{
+    /usr/local/bin/vpn-setup
+} || {
+    echo "⚠ VPN setup encountered an issue, continuing without VPN..."
+}
+
+ip route show
 
 echo ""
 echo "=================================="
