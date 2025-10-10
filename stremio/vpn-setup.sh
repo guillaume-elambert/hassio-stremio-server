@@ -1,137 +1,254 @@
 #!/bin/bash
 set -e
 
-VPN_CONFIG_DIR="/config/vpn"
-CONFIG_PATH="/data/options.json"
+CONFIG_PATH=${CONFIG_PATH:-"/data/options.json"}
+
+JQ_VPN_CONFIG=$(jq 'to_entries | map(select(.key | startswith("vpn_"))) | from_entries' "$CONFIG_PATH")
+
+# Export configuration options as environment variables (VPN config only)
+for opt in $(jq -r 'keys[]' <<<"$JQ_VPN_CONFIG"); do
+    # Skip empty options
+    [[ -z "$opt" ]] && continue
+
+    value=$(jq -r --arg key "$opt" '.[$key] | if type == "boolean" then (if . == true then 1 else 0 end) else . end' <<<"$JQ_VPN_CONFIG")
+    if [[ -n "$value" && "$value" != "null" ]]; then
+        # Escape double quotes in value
+        safe_value="${value//\"/\\\"}"
+        export "${opt^^}"="$safe_value"
+    fi
+done
 
 echo ""
 echo "=================================="
-echo "VPN Configuration"
+echo "VPN Setup"
 echo "=================================="
 
-# Get VPN config file from options
-VPN_CONFIG_FILENAME=$(jq -r '.vpn_config_filename // ""' "$CONFIG_PATH")
-POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "vpn.ovpn" "vpn.conf")
+# Check if VPN is enabled (exported 0 or 1) from options
+VPN_ENABLED=${VPN_ENABLED:-0}
 
-# Check if one of VPN config exists
-for FILE in "${POSSIBLE_FILES[@]}"; do
-    if [ -n "$FILE" ] && [ -f "$VPN_CONFIG_DIR/$FILE" ]; then
-        VPN_CONFIG="$VPN_CONFIG_DIR/$FILE"
+if [ "$VPN_ENABLED" = "0" ]; then
+    echo "ℹ  VPN is disabled"
+    exit 0
+fi
+
+echo "✓ VPN is enabled, configuring Gluetun..."
+
+# Get Home Assistant network info
+HOST_NETWORK_INFO=$(curl -sSL -H "Authorization: Bearer $SUPERVISOR_TOKEN" http://supervisor/network/info)
+
+if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; then
+    # Extract local networks
+    LOCAL_NETWORKS=""
+
+    # Get docker network
+    DOCKER_NETWORK=$(jq -r '.data.docker.address // ""' <<<"$HOST_NETWORK_INFO")
+    if [ -n "$DOCKER_NETWORK" ] && [ "$DOCKER_NETWORK" != "null" ]; then
+        LOCAL_NETWORKS="$DOCKER_NETWORK"
+    fi
+
+    # Get all interface networks
+    readarray -t IPS < <(jq -c '.data.interfaces[]?.ipv4?.address[]? // empty' <<<"$HOST_NETWORK_INFO")
+
+    for IP in "${IPS[@]}"; do
+        if [ -n "$IP" ] && [ "$IP" != "null" ]; then
+            # Remove quotes if present
+            IP=$(tr -d '"' <<<"$IP")
+
+            # Calculate network CIDR
+            NETWORK=$(ipcalc -n "$IP" 2>/dev/null | cut -d= -f2)
+            PREFIX=$(ipcalc -p "$IP" 2>/dev/null | cut -d= -f2)
+
+            if [ -z "$NETWORK" ] || [ -z "$PREFIX" ]; then
+                continue
+            fi
+
+            CIDR="$NETWORK/$PREFIX"
+            if [ -z "$LOCAL_NETWORKS" ]; then
+                LOCAL_NETWORKS="$CIDR"
+            elif ! grep -q "$CIDR" <<<"$LOCAL_NETWORKS"; then
+                # Check if CIDR already exists in LOCAL_NETWORKS
+                LOCAL_NETWORKS="$LOCAL_NETWORKS,$CIDR"
+            fi
+        fi
+    done
+
+    #export FIREWALL_VPN_INPUT_PORTS="8080"
+    export FIREWALL_OUTBOUND_SUBNETS="$LOCAL_NETWORKS"
+    export FIREWALL="on"
+    export FIREWALL_DEBUG="on"
+
+    echo "  Local networks: $LOCAL_NETWORKS"
+fi
+
+# Get VPN configuration from options
+VPN_SERVICE_PROVIDER=$(jq -r '.vpn_service_provider // "custom"' "$CONFIG_PATH")
+VPN_TYPE=$(jq -r '.vpn_type // "openvpn"' "$CONFIG_PATH")
+
+export VPN_SERVICE_PROVIDER
+export VPN_TYPE
+
+if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
+    # Using a known provider
+    # VPN_USERNAME=$(jq -r '.vpn_username // ""' "$CONFIG_PATH")
+    # VPN_PASSWORD=$(jq -r '.vpn_password // ""' "$CONFIG_PATH")
+    # VPN_SERVER_COUNTRIES=$(jq -r '.vpn_server_countries // ""' "$CONFIG_PATH")
+    # VPN_SERVER_REGIONS=$(jq -r '.vpn_server_regions // ""' "$CONFIG_PATH")
+    # VPN_SERVER_CITIES=$(jq -r '.vpn_server_cities // ""' "$CONFIG_PATH")
+    # VPN_SERVER_HOSTNAMES=$(jq -r '.vpn_server_hostnames // ""' "$CONFIG_PATH")
+
+    # Export based on VPN type
+    if [ "$VPN_TYPE" = "wireguard" ]; then
+        [ -n "$VPN_USERNAME" ] && export WIREGUARD_PRIVATE_KEY="$VPN_USERNAME"
+        [ -n "$VPN_PASSWORD" ] && export WIREGUARD_PRESHARED_KEY="$VPN_PASSWORD"
+        [ -n "$VPN_SERVER_COUNTRIES" ] && export SERVER_COUNTRIES="$VPN_SERVER_COUNTRIES"
+        [ -n "$VPN_SERVER_REGIONS" ] && export SERVER_REGIONS="$VPN_SERVER_REGIONS"
+        [ -n "$VPN_SERVER_CITIES" ] && export SERVER_CITIES="$VPN_SERVER_CITIES"
+        [ -n "$VPN_SERVER_HOSTNAMES" ] && export SERVER_HOSTNAMES="$VPN_SERVER_HOSTNAMES"
+    else
+        # OpenVPN
+        [ -n "$VPN_USERNAME" ] && export OPENVPN_USER="$VPN_USERNAME"
+        [ -n "$VPN_PASSWORD" ] && export OPENVPN_PASSWORD="$VPN_PASSWORD"
+        [ -n "$VPN_SERVER_COUNTRIES" ] && export SERVER_COUNTRIES="$VPN_SERVER_COUNTRIES"
+        [ -n "$VPN_SERVER_REGIONS" ] && export SERVER_REGIONS="$VPN_SERVER_REGIONS"
+        [ -n "$VPN_SERVER_CITIES" ] && export SERVER_CITIES="$VPN_SERVER_CITIES"
+        [ -n "$VPN_SERVER_HOSTNAMES" ] && export SERVER_HOSTNAMES="$VPN_SERVER_HOSTNAMES"
+    fi
+
+    echo "  Provider: $VPN_SERVICE_PROVIDER"
+    echo "  Type: $VPN_TYPE"
+    [ -n "$VPN_SERVER_COUNTRIES" ] && echo "  Countries: $VPN_SERVER_COUNTRIES"
+    [ -n "$VPN_SERVER_REGIONS" ] && echo "  Regions: $VPN_SERVER_REGIONS"
+else
+    # Using custom VPN config
+    VPN_CONFIG_DIR="/config/vpn"
+    # VPN_CONFIG_FILENAME=$(jq -r '.vpn_config_filename // ""' "$CONFIG_PATH")
+
+    if [ "$VPN_TYPE" = "wireguard" ]; then
+        POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "wg0.conf" "wireguard.conf" "vpn.conf")
+    else
+        POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "vpn.ovpn" "vpn.conf")
+    fi
+
+    for FILE in "${POSSIBLE_FILES[@]}"; do
+        if [ -z "$FILE" ] || [ "$FILE" == "null" ] || [ ! -f "$VPN_CONFIG_DIR/$FILE" ]; then
+            continue
+        fi
+
+        if [ "$VPN_TYPE" = "wireguard" ]; then
+            export WIREGUARD_CONF_FILE="/config/vpn/$FILE"
+            echo "  Using custom WireGuard config: $FILE"
+            break
+        fi
+
+        export OPENVPN_CUSTOM_CONFIG="/config/vpn/$FILE"
+
+        # Check for auth file
+        if [ -f "$VPN_CONFIG_DIR/auth.txt" ]; then
+            export OPENVPN_USER=$(head -n 1 "$VPN_CONFIG_DIR/auth.txt")
+            export OPENVPN_PASSWORD=$(tail -n 1 "$VPN_CONFIG_DIR/auth.txt")
+            echo "  Using auth.txt for credentials"
+        fi
+
+        echo "  Using custom OpenVPN config: $FILE"
+        break
+    done
+
+    if [ "$VPN_TYPE" = "wireguard" ] && [ -z "$WIREGUARD_CONF_FILE" ]; then
+        echo "  ⚠ No WireGuard config found, continuing without VPN"
+        VPN_ENABLED=0
+    elif [ "$VPN_TYPE" = "openvpn" ] && [ -z "$OPENVPN_CUSTOM_CONFIG" ]; then
+        echo "  ⚠ No OpenVPN config found, continuing without VPN"
+        VPN_ENABLED=0
+    fi
+fi
+
+if [ "$VPN_ENABLED" = "0" ]; then
+    echo "ℹ  VPN is disabled"
+    exit 0
+fi
+
+# Disable pprof to prevent nil pointer dereference
+export PPROF_ENABLED=no
+# export PPROF_HTTP_SERVER_ADDRESS=":0"
+unset PPROF_HTTP_SERVER_ADDRESS
+
+# Disable HTTP control server and proxies
+export HTTPPROXY=off
+export SHADOWSOCKS=off
+# export HTTP_CONTROL_SERVER_ADDRESS=":0"
+export HTTP_CONTROL_SERVER_ADDRESS=""
+
+# DNS settings
+export DOT=off
+export DNS_KEEP_NAMESERVER=on
+export DNS_ADDRESS=127.0.0.1
+
+# Health check settings
+export HEALTH_VPN_DURATION_INITIAL=30s
+export HEALTH_VPN_DURATION_ADDITION=10s
+export HEALTH_SUCCESS_WAIT_DURATION=5s
+
+# Logging
+export LOG_LEVEL=debug
+export LOG_TO_STDOUT=on
+export GOTRACEBACK=all
+
+# Updater settings - disable to prevent issues
+export UPDATER_PERIOD=0
+
+# Version information
+export VERSION_INFORMATION=on
+
+env
+
+# Start Gluetun in background
+echo "→ Starting Gluetun VPN..."
+/gluetun-entrypoint 2>&1 | tee /tmp/gluetun.log &
+GLUETUN_PID=$!
+
+# Give it a moment to initialize
+sleep 5
+
+# Wait for VPN to connect
+echo -n "→ Waiting for VPN connection"
+VPN_CONNECTED=0
+for i in {1..60}; do
+    sleep 1
+    echo -n "."
+
+    # Check if tun interface exists
+    if ip link show tun0 >/dev/null 2>&1; then
+        VPN_CONNECTED=1
+        break
+    fi
+
+    # Check if Gluetun is still running
+    if ! kill -0 $GLUETUN_PID 2>/dev/null; then
+        echo ""
+        echo "✗ Gluetun exited unexpectedly"
+        echo "Last 30 lines of Gluetun log:"
+        tail -n 30 /tmp/gluetun.log 2>/dev/null || echo "No log available"
         break
     fi
 done
 
-# Exit if no config found
-if [ -z "$VPN_CONFIG" ]; then
-    echo "ℹ  No VPN configuration found - skipping VPN setup"
+if [ "$VPN_CONNECTED" = "1" ]; then
+    echo ""
+    echo "✓ VPN connected successfully!"
+
+    # Get VPN IP
+    sleep 2
+    VPN_IP=$(curl -s --max-time 10 https://api.ipify.org 2>/dev/null || echo "unknown")
+    echo "  Public IP: $VPN_IP"
+
+    # Show routing info
+    echo "  VPN Interface: tun0"
+    echo "  Local networks bypassing VPN: $LOCAL_NETWORKS"
     exit 0
 fi
 
-echo "ℹ VPN config found: $VPN_CONFIG"
-
-# Auto-detect local network
-AUTO_DETECT_NETWORK() {
-    # Get default gateway interface
-    DEFAULT_IFACE=$(ip route | grep default | grep -v tun | awk '{print $5}' | head -n1)
-    
-    if [ -z "$DEFAULT_IFACE" ]; then
-        echo "⚠ Could not detect default network interface"
-        exit 1
-    fi
-    
-    # Get IP and netmask of default interface
-    LOCAL_IP=$(ip -o -f inet addr show "$DEFAULT_IFACE" | awk '{print $4}')
-    
-    if [ -z "$LOCAL_IP" ]; then
-        echo "⚠ Could not detect local IP"
-        exit 1
-    fi
-    
-    echo "$LOCAL_IP"
-}
-
-# Get local network from config or auto-detect
-LOCAL_NETWORK=$(jq -r '.local_network // ""' "$CONFIG_PATH")
-
-if [ -z "$LOCAL_NETWORK" ]; then
-    echo "→ Auto-detecting local network..."
-    LOCAL_NETWORK=$(AUTO_DETECT_NETWORK)
-    
-    if [ $? -eq 0 ]; then
-        echo "✓ Detected local network: $LOCAL_NETWORK"
-    else
-        echo "⚠ Auto-detection failed, using common private ranges"
-        LOCAL_NETWORK="auto"
-    fi
-else
-    echo "✓ Using configured local network: $LOCAL_NETWORK"
-fi
-
-# Store for use in routing script
-export LOCAL_NETWORK
-export DEFAULT_GATEWAY=$(ip route | grep default | grep -v tun | awk '{print $3}' | head -n1)
-export DEFAULT_IFACE=$(ip route | grep default | grep -v tun | awk '{print $5}' | head -n1)
-
-echo "  Gateway: $DEFAULT_GATEWAY via $DEFAULT_IFACE"
-
-# Prepare OpenVPN config
-mkdir -p /etc/openvpn
-cp "$VPN_CONFIG" /etc/openvpn/client.conf
-
-# Add authentication if exists
-if [ -f "$VPN_CONFIG_DIR/auth.txt" ]; then
-    cp "$VPN_CONFIG_DIR/auth.txt" /etc/openvpn/auth.txt
-    chmod 600 /etc/openvpn/auth.txt
-    
-    if ! grep -q "auth-user-pass" /etc/openvpn/client.conf; then
-        echo "auth-user-pass /etc/openvpn/auth.txt" >> /etc/openvpn/client.conf
-    else
-        sed -i 's|auth-user-pass.*|auth-user-pass /etc/openvpn/auth.txt|g' /etc/openvpn/client.conf
-    fi
-    echo "✓ VPN authentication configured"
-fi
-
-# Configure OpenVPN for split tunneling
-# if ! grep -q "route-nopull" /etc/openvpn/client.conf; then
-#     echo "route-nopull" >> /etc/openvpn/client.conf
-# fi
-
-# if ! grep -q "script-security 2" /etc/openvpn/client.conf; then
-#     echo "script-security 2" >> /etc/openvpn/client.conf
-# fi
-
-# # Prevent DNS changes
-# if ! grep -q "pull-filter ignore \"dhcp-option DNS\"" /etc/openvpn/client.conf; then
-#     echo "pull-filter ignore \"dhcp-option DNS\"" >> /etc/openvpn/client.conf
-# fi
-
-# Start OpenVPN
-echo "→ Starting OpenVPN..."
-openvpn --config /etc/openvpn/client.conf --daemon
-
-# Wait for connection
-echo -n "→ Waiting for VPN connection"
-for i in {1..30}; do
-    sleep 1
-    echo -n "."
-    
-    TUN_IFACE=$(ip -o link show | awk -F': ' '/tun[0-9]+/ {print $2}' | head -n1)
-    if [ -n "$TUN_IFACE" ]; then
-        echo ""
-        echo "✓ VPN connection established!"
-        
-        # Get VPN IP
-        VPN_IP=$(ip addr show "$TUN_IFACE" | grep "inet\b" | awk '{print $2}' | cut -d/ -f1)
-        echo "  VPN IP: $VPN_IP"
-        
-        # Get public IP
-        PUBLIC_IP=$(timeout 5 curl -s ifconfig.me 2>/dev/null || echo "unknown")
-        echo "  Public IP: $PUBLIC_IP"
-    
-        exit 0
-    fi
-done
-
 echo ""
-echo "✗ VPN connection timeout - continuing without VPN"
+echo "✗ VPN connection timeout"
+echo "Last 30 lines of Gluetun log:"
+tail -n 30 /tmp/gluetun.log 2>/dev/null || echo "No log available"
 exit 1

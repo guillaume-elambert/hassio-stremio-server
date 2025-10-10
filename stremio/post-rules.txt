@@ -1,0 +1,3 @@
+# Allow all UDP on the Gluetun VPN interface (tun0)
+iptables -A INPUT -i tun0 -p udp -j ACCEPT
+iptables -A OUTPUT -o tun0 -p udp -j ACCEPT

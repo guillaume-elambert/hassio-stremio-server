@@ -1,39 +1,26 @@
 #!/bin/bash
 set -e
 
-CONFIG_PATH=/data/options.json
-LOCAL_STORAGE_PATH=./localStorage.json
-EXCLUDE_OPTIONS=("localStorage" "device" "local_network" "vpn_config_filename")
-
-ip route show
-
-# Setup VPN - catch any failures
-{
-    /usr/local/bin/vpn-setup
-} || {
-    echo "⚠ VPN setup encountered an issue, continuing without VPN..."
-}
-
-ip route show
-
-echo ""
-echo "=================================="
-echo "Loading Stremio Configuration"
-echo "=================================="
+CONFIG_PATH=${CONFIG_PATH:-"/data/options.json"}
+LOCAL_STORAGE_PATH=${LOCAL_STORAGE_PATH:-"./localStorage.json"}
+EXCLUDE_OPTIONS=("localStorage" "local_network" "^vpn_.*$")
 
 # Function to check if element is in array
 in_array() {
     local e
-    for e in "${@:2}"; do [[ "$e" == "$1" ]] && return 0; done
+    for e in "${@:2}"; do
+        [[ "$1" == "$e" ]] && return 0
+        [[ "$1" =~ $e ]] && return 0
+    done
     return 1
 }
 
-# Export configuration options as environment variables
+# Export configuration options as environment variables (Stremio config only)
 for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
     # Skip empty options
     [[ -z "$opt" ]] && continue
 
-    # Skip excluded options
+    # Skip excluded options (VPN and localStorage handled separately)
     if in_array "$opt" "${EXCLUDE_OPTIONS[@]}"; then
         continue
     fi
@@ -46,10 +33,18 @@ for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
     fi
 done
 
+# Setup VPN, it returns 1 if VPN setup fails, make sure it doesn't stop the script
+./vpn-setup.sh || true
+
+echo ""
+echo "=================================="
+echo "Loading Stremio Configuration"
+echo "=================================="
+
 # Handle localStorage option
 LOCAL_STORAGE=$(jq -r '.localStorage // empty' "$CONFIG_PATH")
 if [[ -n "$LOCAL_STORAGE" ]]; then
-    echo "$LOCAL_STORAGE" > "$LOCAL_STORAGE_PATH"
+    echo "$LOCAL_STORAGE" >"$LOCAL_STORAGE_PATH"
     echo "  ✓ localStorage configuration saved"
 fi
 

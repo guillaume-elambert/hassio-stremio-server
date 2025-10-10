@@ -1,8 +1,8 @@
 ---
-version: 1.0.0
+version: 1.0.1
 name: Stremio Server
 slug: stremio_server
-description: Run Stremio server on Home Assistant OS with hardware acceleration
+description: Run Stremio server on Home Assistant OS with hardware acceleration and VPN support
 url: https://github.com/guillaume-elambert/hassio-stremio-server/tree/main/stremio
 arch:
   - aarch64
@@ -10,7 +10,7 @@ arch:
   - armv7
 startup: services
 webui: "[PROTO:web_ui_protocol]://[HOST]:[PORT:8080]/"
-host_network: true
+hassio_api: true
 
 options:
   web_ui_protocol: https
@@ -28,6 +28,9 @@ options:
   password: ""
   disable_caching: false
   localStorage: ""
+  vpn_enabled: false
+  vpn_service_provider: "custom"
+  vpn_type: "openvpn"
 
 schema:
   web_ui_protocol: list(http|https)
@@ -47,15 +50,23 @@ schema:
   password: str
   disable_caching: bool
   localStorage: str
-  local_network: str?
+  
+  # VPN Configuration
+  vpn_enabled: bool
+  vpn_service_provider: list(custom|nordvpn|expressvpn|protonvpn|surfshark|mullvad|privateinternetaccess|purevpn|vyprvpn|windscribe|torguard|airvpn|perfectprivacy|ivpn|cyberghost|ipvanish)?
+  vpn_type: list(openvpn|wireguard)?
   vpn_config_filename: str?
+  vpn_username: str?
+  vpn_password: password?
+  vpn_server_countries: str?
+  vpn_server_regions: str?
+  vpn_server_cities: str?
+  vpn_server_hostnames: str?
 
 ports:
   8080/tcp: 8080
 
 ports_description:
-  # 11470/tcp: Stremio server HTTP port
-  # 12470/tcp: Stremio server HTTPS port
   8080/tcp: Stremio Web UI port
 
 # Hardware acceleration and network capabilities
@@ -69,8 +80,8 @@ devices:
 
 privileged:
   - NET_ADMIN
+  - SYS_MODULE
   - NET_RAW
-  # - SYS_MODULE
 
 map:
   - media:rw

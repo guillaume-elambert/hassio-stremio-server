@@ -4,15 +4,12 @@ configuration:
         name: Web UI Protocol
         description: >
             Protocol for accessing the Stremio Web UI. Can be either 'http' or 'https'.
-    image_version:
-        name: Image Version
-        description: >
-            Version of the Stremio Docker image to use, see https://hub.docker.com/r/tsaridas/stremio-docker/tags for available versions.
     ipaddress:
         name: IP Address
         description: >
             Set this to a valid IPv4 in order to enable https and generate certificates with stremio domain. 
-            If you set this to 0.0.0.0 it will try to automatically get your public ip. Getting the public ip and DNS is not reliable and might need multiple retries. It will not work for IPv6.
+            If you set this to 0.0.0.0 it will try to automatically get your public ip.
+            Getting the public ip and DNS is not reliable and might need multiple retries. It will not work for IPv6.
     server_url:
         name: Server URL
         description: Manually sets the streaming server URL. This is useful when you want to force a specific URL.
@@ -78,21 +75,58 @@ configuration:
         name: Default Web UI Local Storage
         description: >
             Set the default localStorage for the web UI. Useful for pre-configuring certain settings or addons.
-            For more information, see https://github.com/tsaridas/stremio-docker/pull/59.
-    local_network:
-        name: Local Network CIDR
+    
+    # VPN Settings
+    vpn_enabled:
+        name: Enable VPN
         description: >
-            Define your local network in CIDR notation (e.g., 192.168.1.0/24).
-            Leave empty for automatic detection. Only used when VPN is configured.
-            The addon will automatically route local traffic directly while routing internet through VPN.
+            Enable VPN connection for all internet traffic. Local network access is preserved.
+            When disabled, all traffic goes directly through your network.
+    vpn_service_provider:
+        name: VPN Provider
+        description: >
+            Select your VPN provider. Choose 'custom' to use your own OpenVPN/WireGuard configuration file.
+            Supported providers: NordVPN, ExpressVPN, ProtonVPN, Surfshark, Mullvad, Private Internet Access, 
+            PureVPN, VyprVPN, Windscribe, TorGuard, AirVPN, Perfect Privacy, IVPN, CyberGhost, IPVanish.
+    vpn_type:
+        name: VPN Type
+        description: >
+            Select VPN protocol type: OpenVPN or WireGuard.
     vpn_config_filename:
-        name: VPN Configuration Filename
+        name: VPN Config Filename
         description: >
-            Specify the filename of your VPN configuration file placed in the /addon_configs/d05ec1cd_stremio_server/ directory.
-            Supported formats are .ovpn and .conf. If left empty, the addon will look for 'vpn.ovpn' or 'vpn.conf' by default.
-            This allows you to easily set up a VPN connection for secure streaming while keeping local network access intact.
-            If you do not wish to use a VPN, do not carre about this setting and leave it empty, it is not required.
+            (For custom provider) Filename of your VPN config in /addon_configs/xxxxx_stremio_server/vpn/
+            Example: 'my-vpn.ovpn' or 'my-vpn.conf'. Leave empty to auto-detect 'vpn.ovpn' or 'vpn.conf'.
+    vpn_username:
+        name: VPN Username
+        description: >
+            Your VPN username. Required for most VPN providers.
+            For custom configs, you can also use auth.txt file instead.
+    vpn_password:
+        name: VPN Password
+        description: >
+            Your VPN password. Required for most VPN providers.
+            For custom configs, you can also use auth.txt file instead.
+    vpn_server_countries:
+        name: VPN Server Countries
+        description: >
+            (Optional) Comma-separated list of country codes (e.g., 'us,uk,de').
+            Leave empty for any country. Only used with supported providers.
+    vpn_server_regions:
+        name: VPN Server Regions
+        description: >
+            (Optional) Comma-separated list of regions.
+            Leave empty for any region. Only used with supported providers.
+    vpn_server_cities:
+        name: VPN Server Cities
+        description: >
+            (Optional) Comma-separated list of cities.
+            Leave empty for any city. Only used with supported providers.
+    vpn_server_hostnames:
+        name: VPN Server Hostnames
+        description: >
+            (Optional) Comma-separated list of specific server hostnames.
+            Leave empty for automatic selection. Only used with supported providers.
+
 network:
-    11470/tcp: Stremio server HTTP port
-    12470/tcp: Stremio server HTTPS port
     8080/tcp: Stremio Web UI port
