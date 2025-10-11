@@ -12,7 +12,7 @@ FROM qmcgaw/gluetun:v3.40 as gluetun
 # Stage 2: Build final image
 FROM tsaridas/stremio-docker:${IMAGE_VERSION} as final
 
-# Glutun environment variables with default values
+# Gluetun environment variables with default values
 ENV VPN_SERVICE_PROVIDER=pia \
     VPN_TYPE=openvpn \
     # Common VPN options
@@ -31,6 +31,7 @@ ENV VPN_SERVICE_PROVIDER=pia \
     OPENVPN_CIPHERS= \
     OPENVPN_AUTH= \
     OPENVPN_PROCESS_USER=root \
+    OPENVPN_MSSFIX= \
     OPENVPN_CUSTOM_CONFIG= \
     # Wireguard
     WIREGUARD_ENDPOINT_IP= \
@@ -45,7 +46,7 @@ ENV VPN_SERVICE_PROVIDER=pia \
     WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL=0 \
     WIREGUARD_ADDRESSES= \
     WIREGUARD_ADDRESSES_SECRETFILE=/run/secrets/wireguard_addresses \
-    WIREGUARD_MTU=1400 \
+    WIREGUARD_MTU=1320 \
     WIREGUARD_IMPLEMENTATION=auto \
     # VPN server filtering
     SERVER_REGIONS= \
@@ -53,10 +54,10 @@ ENV VPN_SERVICE_PROVIDER=pia \
     SERVER_CITIES= \
     SERVER_HOSTNAMES= \
     SERVER_CATEGORIES= \
-    # # Mullvad only:
+    # Mullvad only:
     ISP= \
     OWNED_ONLY=no \
-    # # Private Internet Access only:
+    # Private Internet Access only:
     PRIVATE_INTERNET_ACCESS_OPENVPN_ENCRYPTION_PRESET= \
     VPN_PORT_FORWARDING=off \
     VPN_PORT_FORWARDING_LISTENING_PORT=0 \
@@ -64,29 +65,33 @@ ENV VPN_SERVICE_PROVIDER=pia \
     VPN_PORT_FORWARDING_STATUS_FILE="/tmp/gluetun/forwarded_port" \
     VPN_PORT_FORWARDING_USERNAME= \
     VPN_PORT_FORWARDING_PASSWORD= \
-    # # Cyberghost only:
+    VPN_PORT_FORWARDING_UP_COMMAND= \
+    VPN_PORT_FORWARDING_DOWN_COMMAND= \
+    # Cyberghost only:
     OPENVPN_CERT= \
     OPENVPN_KEY= \
     OPENVPN_CLIENTCRT_SECRETFILE=/run/secrets/openvpn_clientcrt \
     OPENVPN_CLIENTKEY_SECRETFILE=/run/secrets/openvpn_clientkey \
-    # # VPNSecure only:
+    # VPNSecure only:
     OPENVPN_ENCRYPTED_KEY= \
     OPENVPN_ENCRYPTED_KEY_SECRETFILE=/run/secrets/openvpn_encrypted_key \
     OPENVPN_KEY_PASSPHRASE= \
     OPENVPN_KEY_PASSPHRASE_SECRETFILE=/run/secrets/openvpn_key_passphrase \
-    # # Nordvpn only:
+    # Nordvpn only:
     SERVER_NUMBER= \
-    # # PIA only:
+    # PIA only:
     SERVER_NAMES= \
-    # # ProtonVPN only:
+    # VPNUnlimited and ProtonVPN only:
+    STREAM_ONLY= \
     FREE_ONLY= \
+    # ProtonVPN only:
     SECURE_CORE_ONLY= \
     TOR_ONLY= \
-    # # Surfshark only:
+    # Surfshark only:
     MULTIHOP_ONLY= \
-    # # VPN Secure only:
+    # VPN Secure only:
     PREMIUM_ONLY= \
-    # # PIA only:
+    # PIA and ProtonVPN only:
     PORT_FORWARD_ONLY= \
     # Firewall
     FIREWALL_ENABLED_DISABLING_IT_SHOOTS_YOU_IN_YOUR_FOOT=on \
@@ -106,9 +111,6 @@ ENV VPN_SERVICE_PROVIDER=pia \
     DOT=on \
     DOT_PROVIDERS=cloudflare \
     DOT_PRIVATE_ADDRESS=127.0.0.1/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.0.0/16,::1/128,fc00::/7,fe80::/10,::ffff:7f00:1/104,::ffff:a00:0/104,::ffff:a9fe:0/112,::ffff:ac10:0/108,::ffff:c0a8:0/112 \
-    DOT_VERBOSITY=1 \
-    DOT_VERBOSITY_DETAILS=0 \
-    DOT_VALIDATION_LOGLEVEL=0 \
     DOT_CACHING=on \
     DOT_IPV6=off \
     BLOCK_MALICIOUS=on \
@@ -144,9 +146,11 @@ ENV VPN_SERVICE_PROVIDER=pia \
     UPDATER_VPN_SERVICE_PROVIDERS= \
     # Public IP
     PUBLICIP_FILE="/tmp/gluetun/ip" \
-    PUBLICIP_PERIOD=12h \
-    PUBLICIP_API=ipinfo \
+    PUBLICIP_ENABLED=on \
+    PUBLICIP_API=ipinfo,ifconfigco,ip2location,cloudflare \
     PUBLICIP_API_TOKEN= \
+    # Storage
+    STORAGE_FILEPATH=/gluetun/servers.json \
     # Pprof
     PPROF_ENABLED=no \
     PPROF_BLOCK_PROFILE_RATE=0 \
@@ -161,7 +165,8 @@ ENV VPN_SERVICE_PROVIDER=pia \
 # Install required packages
 RUN apk add --no-cache \
     bash \
-    jq
+    jq \
+    ipcalc
 
 # Copy Gluetun binaries and scripts from the Gluetun image
 COPY --from=gluetun /gluetun /gluetun
@@ -171,7 +176,7 @@ RUN apk add --no-cache --update -l wget && \
     apk add --no-cache --update -X "https://dl-cdn.alpinelinux.org/alpine/v3.17/main" openvpn\~2.5 && \
     mv /usr/sbin/openvpn /usr/sbin/openvpn2.5 && \
     apk del openvpn
-RUN apk add --no-cache --update openvpn ca-certificates iptables iptables unbound tzdata
+RUN apk add --no-cache --update openvpn ca-certificates iptables unbound tzdata
 RUN mv /usr/sbin/openvpn /usr/sbin/openvpn2.6 && \
     rm -rf /var/cache/apk/* /etc/unbound/* /usr/sbin/unbound-* /etc/openvpn/*.sh /usr/lib/openvpn/plugins/openvpn-plugin-down-root.so && \
     deluser openvpn || true && \

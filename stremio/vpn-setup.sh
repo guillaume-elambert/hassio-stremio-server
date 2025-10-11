@@ -23,6 +23,10 @@ echo "=================================="
 echo "VPN Setup"
 echo "=================================="
 
+if [ -n "$DEBUG_ENABLED" ] && [ "$DEBUG_ENABLED" = "1" ]; then
+    DEBUG_ENABLED="on"
+fi
+
 # Check if VPN is enabled (exported 0 or 1) from options
 VPN_ENABLED=${VPN_ENABLED:-0}
 
@@ -72,23 +76,29 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
         fi
     done
 
-    # CRITICAL FOR TORRENTS: Allow incoming VPN traffic and common torrent ports
-    export FIREWALL_VPN_INPUT_PORTS="8080,51413"
+    # CRITICAL: Open firewall for Stremio streaming and torrenting
+    # Stremio uses ports 11470 (HTTP) and 12470 (HTTPS) for streaming
+    export FIREWALL_VPN_INPUT_PORTS="8080,11470,12470,51413"
+    export FIREWALL_INPUT_PORTS="8080,11470,12470,51413"
     export FIREWALL_OUTBOUND_SUBNETS="$LOCAL_NETWORKS"
-    export FIREWALL_DEBUG="on"
+    export FIREWALL_DEBUG=$DEBUG_ENABLED
 
     echo "  Local networks: $LOCAL_NETWORKS"
-    echo "  Firewall VPN input ports: 8080,51413"
+    echo "  Firewall VPN input ports: 8080,11470,12470,51413"
 fi
 
 # Get VPN configuration from options
 VPN_SERVICE_PROVIDER=$(jq -r '.vpn_service_provider // "custom"' "$CONFIG_PATH")
-VPN_TYPE=$(jq -r '.vpn_type // "openvpn"' "$CONFIG_PATH")
 
 export VPN_SERVICE_PROVIDER
 export VPN_TYPE
 
 if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
+    if [ "$VPN_PORT_FORWARDING" = "1" ]; then
+        VPN_PORT_FORWARDING="on"
+        VPN_PORT_FORWARDING_PROVIDER=$VPN_SERVICE_PROVIDER
+    fi
+
     # Using a known provider
     # Export based on VPN type
     if [ "$VPN_TYPE" = "wireguard" ]; then
@@ -160,6 +170,10 @@ if [ "$VPN_ENABLED" = "0" ]; then
     exit 0
 fi
 
+if [ "$VPN_PORT_FORWARDING" != "on" ]; then
+    VPN_PORT_FORWARDING="off"
+fi
+
 # Disable pprof to prevent nil pointer dereference
 export PPROF_ENABLED=no
 unset PPROF_HTTP_SERVER_ADDRESS
@@ -169,10 +183,11 @@ export HTTPPROXY=off
 export SHADOWSOCKS=off
 export HTTP_CONTROL_SERVER_ADDRESS=""
 
-# DNS settings
+# DNS settings - use Docker DNS
+# DOCKER_DNS=$(jq -r '.data.docker.dns // "127.0.0.11"' <<<"$HOST_NETWORK_INFO")
 export DOT=off
-# export DNS_KEEP_NAMESERVER=on
-export DNS_ADDRESS=127.0.0.11 #$(jq -r '.data.docker.dns // ""' <<<"$HOST_NETWORK_INFO") #127.0.0.1
+# export DNS_ADDRESS="$DOCKER_DNS"
+export DNS_ADDRESS=127.0.0.11
 
 # Health check settings
 export HEALTH_VPN_DURATION_INITIAL=30s
@@ -223,25 +238,37 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     echo ""
     echo "✓ VPN connected successfully!"
 
-    # # Wait a bit for Gluetun to fully configure firewall
-    # sleep 3
-
-    # # Apply additional iptables rules for torrenting (from post-rules.txt)
-    # echo "→ Applying torrent-friendly firewall rules..."
-    # if [ -f "/iptables/post-rules.txt" ]; then
-    #     while IFS= read -r rule; do
-    #         # Skip empty lines and comments
-    #         [[ -z "$rule" || "$rule" =~ ^# ]] && continue
-    #         # Execute the rule
-    #         eval "$rule" 2>/dev/null || echo "  ⚠ Failed to apply rule: $rule"
-    #     done < "/iptables/post-rules.txt"
-    #     echo "  ✓ Post-rules applied"
-    # fi
-
     # Get VPN IP
     sleep 2
     VPN_IP=$(curl -s --max-time 10 https://api.ipify.org 2>/dev/null || echo "unknown")
     echo "  Public IP: $VPN_IP"
+
+    # Checkvpn for port forwarding (PIA)
+    if [ "$VPN_PORT_FORWARDING" = "on" ]; then
+        echo -n "  Waiting for port forwarding"
+        for i in {1..30}; do
+            sleep 1
+            echo -n "."
+            if [ -f "/tmp/gluetun/forwarded_port" ]; then
+                FORWARDED_PORT=$(cat /tmp/gluetun/forwarded_port 2>/dev/null || echo "")
+                if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ]; then
+                    echo ""
+                    echo "  ✓ Port forwarding active: $FORWARDED_PORT"
+                    
+                    # Add forwarded port to firewall
+                    iptables -I INPUT 1 -p tcp --dport "$FORWARDED_PORT" -j ACCEPT 2>/dev/null || true
+                    iptables -I INPUT 1 -p udp --dport "$FORWARDED_PORT" -j ACCEPT 2>/dev/null || true
+                    echo "  ✓ Firewall updated for forwarded port"
+                    break
+                fi
+            fi
+        done
+        
+        if [ -z "$FORWARDED_PORT" ] || [ "$FORWARDED_PORT" = "0" ]; then
+            echo ""
+            echo "  ⚠ Port forwarding not available (this is normal for some VPN servers)"
+        fi
+    fi
 
     # Show routing info
     echo "  VPN Interface: tun0"
@@ -249,8 +276,35 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     
     # Show firewall rules for debugging
     echo ""
-    echo "→ Active iptables rules:"
-    iptables -L INPUT -v -n | grep -E "(Chain|tun0|51413)" || echo "  No specific torrent rules found"
+    echo "→ Active firewall INPUT rules:"
+    iptables -L INPUT -v -n --line-numbers | head -20
+    
+    echo ""
+    echo "→ Testing connectivity:"
+
+    HOST_INFO=$()
+    HOST_HOSTNAME=$(curl -sSL -H "Authorization: Bearer $SUPERVISOR_TOKEN" http://supervisor/info | jq -r '.data.hostname // ""' || echo "")
+    HOST_PORT=$(curl -sSL -H "Authorization: Bearer $SUPERVISOR_TOKEN" http://supervisor/core/info | jq -r '.data.port // ""' || echo "")
+
+    LOCAL_NETWORK_CONNECTIVITY=$(ping -c 1 -W 2 "$DOCKER_GATEWAY" >/dev/null 2>&1 && echo $?)
+    if [ -n "$HOST_HOSTNAME" ]; then
+        # Check if LOCAL_NETWORK_CONNECTIVITY is set, if not set it to 1 (not connected)
+        LOCAL_NETWORK_CONNECTIVITY=${LOCAL_NETWORK_CONNECTIVITY:-1} && $()
+    fi
+
+    # Test local network
+    if ping -c 1 -W 2 "$DOCKER_GATEWAY" >/dev/null 2>&1; then
+        echo "  ✓ Local network accessible"
+    else
+        echo "  ⚠ Local network test failed"
+    fi
+    
+    # Test VPN
+    if timeout 5 curl -s https://1.1.1.1 >/dev/null 2>&1; then
+        echo "  ✓ Internet through VPN working"
+    else
+        echo "  ⚠ VPN connectivity test failed"
+    fi
     
     exit 0
 fi

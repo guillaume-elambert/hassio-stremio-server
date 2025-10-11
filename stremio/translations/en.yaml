@@ -127,6 +127,17 @@ configuration:
         description: >
             (Optional) Comma-separated list of specific server hostnames.
             Leave empty for automatic selection. Only used with supported providers.
+    vpn_port_forwarding:
+        name: Enable Port Forwarding
+        description: >
+            Enable VPN port forwarding for better torrent performance.
+            Only works with providers that support it (PIA, ProtonVPN).
+            When enabled, incoming connections are allowed through a dynamically assigned port.
+    debug_enabled:
+        name: Enable Debug Logging
+        description: >
+            Enable verbose debug logging for VPN and Stremio.
+            Useful for troubleshooting connection issues.
 
 network:
     8080/tcp: Stremio Web UI port

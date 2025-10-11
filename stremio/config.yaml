@@ -1,5 +1,5 @@
 ---
-version: 1.0.1
+version: 1.0.2
 name: Stremio Server
 slug: stremio_server
 description: Run Stremio server on Home Assistant OS with hardware acceleration and VPN support
@@ -29,7 +29,6 @@ options:
   disable_caching: false
   localStorage: ""
   vpn_enabled: false
-  vpn_service_provider: "custom"
   vpn_type: "openvpn"
 
 schema:
@@ -51,11 +50,11 @@ schema:
   disable_caching: bool
   localStorage: str
   
-  # VPN Configuration
+  # VPN Configuration (Custom configs only)
   vpn_enabled: bool
-  
-  vpn_service_provider: list(custom|airvpn|cyberghost|expressvpn|fastestvpn|giganews|hidemyass|ipvanish|ivpn|mullvad|nordvpn|perfect privacy|privado|private internet access|privatevpn|protonvpn|purevpn|slickvpn|surfshark|torguard|vpnsecure|vpn unlimited|vyprvpn|wevpn|windscribe)?
   vpn_type: list(openvpn|wireguard)?
+  vpn_service_provider: list(custom|airvpn|cyberghost|expressvpn|fastestvpn|giganews|hidemyass|ipvanish|ivpn|mullvad|nordvpn|perfect privacy|privado|private internet access|privatevpn|protonvpn|purevpn|slickvpn|surfshark|torguard|vpnsecure|vpn unlimited|vyprvpn|wevpn|windscribe)?
+  vpn_config_filename: str?
   vpn_config_filename: str?
   vpn_username: str?
   vpn_password: password?
@@ -63,6 +62,8 @@ schema:
   vpn_server_regions: str?
   vpn_server_cities: str?
   vpn_server_hostnames: str?
+  vpn_port_forwarding: bool?
+  debug_enabled: bool?
 
 ports:
   8080/tcp: 8080
@@ -82,7 +83,6 @@ devices:
 privileged:
   - NET_ADMIN
   - SYS_MODULE
-  - NET_RAW
 
 map:
   - media:rw
