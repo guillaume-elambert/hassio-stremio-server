@@ -53,7 +53,8 @@ schema:
   
   # VPN Configuration
   vpn_enabled: bool
-  vpn_service_provider: list(custom|nordvpn|expressvpn|protonvpn|surfshark|mullvad|privateinternetaccess|purevpn|vyprvpn|windscribe|torguard|airvpn|perfectprivacy|ivpn|cyberghost|ipvanish)?
+  
+  vpn_service_provider: list(custom|airvpn|cyberghost|expressvpn|fastestvpn|giganews|hidemyass|ipvanish|ivpn|mullvad|nordvpn|perfect privacy|privado|private internet access|privatevpn|protonvpn|purevpn|slickvpn|surfshark|torguard|vpnsecure|vpn unlimited|vyprvpn|wevpn|windscribe)?
   vpn_type: list(openvpn|wireguard)?
   vpn_config_filename: str?
   vpn_username: str?

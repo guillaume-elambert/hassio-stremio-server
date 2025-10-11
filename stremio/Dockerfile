@@ -7,7 +7,7 @@ ARG BUILD_NAME
 ARG BUILD_VERSION
 
 # Stage 1: Get Gluetun VPN binaries (using specific stable version)
-FROM qmcgaw/gluetun:v3.39.1 as gluetun
+FROM qmcgaw/gluetun:v3.40 as gluetun
 
 # Stage 2: Build final image
 FROM tsaridas/stremio-docker:${IMAGE_VERSION} as final

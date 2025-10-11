@@ -72,12 +72,13 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
         fi
     done
 
-    #export FIREWALL_VPN_INPUT_PORTS="8080"
+    # CRITICAL FOR TORRENTS: Allow incoming VPN traffic and common torrent ports
+    export FIREWALL_VPN_INPUT_PORTS="8080,51413"
     export FIREWALL_OUTBOUND_SUBNETS="$LOCAL_NETWORKS"
-    export FIREWALL="on"
     export FIREWALL_DEBUG="on"
 
     echo "  Local networks: $LOCAL_NETWORKS"
+    echo "  Firewall VPN input ports: 8080,51413"
 fi
 
 # Get VPN configuration from options
@@ -89,13 +90,6 @@ export VPN_TYPE
 
 if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
     # Using a known provider
-    # VPN_USERNAME=$(jq -r '.vpn_username // ""' "$CONFIG_PATH")
-    # VPN_PASSWORD=$(jq -r '.vpn_password // ""' "$CONFIG_PATH")
-    # VPN_SERVER_COUNTRIES=$(jq -r '.vpn_server_countries // ""' "$CONFIG_PATH")
-    # VPN_SERVER_REGIONS=$(jq -r '.vpn_server_regions // ""' "$CONFIG_PATH")
-    # VPN_SERVER_CITIES=$(jq -r '.vpn_server_cities // ""' "$CONFIG_PATH")
-    # VPN_SERVER_HOSTNAMES=$(jq -r '.vpn_server_hostnames // ""' "$CONFIG_PATH")
-
     # Export based on VPN type
     if [ "$VPN_TYPE" = "wireguard" ]; then
         [ -n "$VPN_USERNAME" ] && export WIREGUARD_PRIVATE_KEY="$VPN_USERNAME"
@@ -121,7 +115,6 @@ if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
 else
     # Using custom VPN config
     VPN_CONFIG_DIR="/config/vpn"
-    # VPN_CONFIG_FILENAME=$(jq -r '.vpn_config_filename // ""' "$CONFIG_PATH")
 
     if [ "$VPN_TYPE" = "wireguard" ]; then
         POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "wg0.conf" "wireguard.conf" "vpn.conf")
@@ -169,19 +162,17 @@ fi
 
 # Disable pprof to prevent nil pointer dereference
 export PPROF_ENABLED=no
-# export PPROF_HTTP_SERVER_ADDRESS=":0"
 unset PPROF_HTTP_SERVER_ADDRESS
 
 # Disable HTTP control server and proxies
 export HTTPPROXY=off
 export SHADOWSOCKS=off
-# export HTTP_CONTROL_SERVER_ADDRESS=":0"
 export HTTP_CONTROL_SERVER_ADDRESS=""
 
 # DNS settings
 export DOT=off
-export DNS_KEEP_NAMESERVER=on
-export DNS_ADDRESS=127.0.0.1
+# export DNS_KEEP_NAMESERVER=on
+export DNS_ADDRESS=127.0.0.11 #$(jq -r '.data.docker.dns // ""' <<<"$HOST_NETWORK_INFO") #127.0.0.1
 
 # Health check settings
 export HEALTH_VPN_DURATION_INITIAL=30s
@@ -189,17 +180,13 @@ export HEALTH_VPN_DURATION_ADDITION=10s
 export HEALTH_SUCCESS_WAIT_DURATION=5s
 
 # Logging
-export LOG_LEVEL=debug
-export LOG_TO_STDOUT=on
-export GOTRACEBACK=all
+export LOG_LEVEL=info
 
 # Updater settings - disable to prevent issues
 export UPDATER_PERIOD=0
 
 # Version information
 export VERSION_INFORMATION=on
-
-env
 
 # Start Gluetun in background
 echo "→ Starting Gluetun VPN..."
@@ -236,6 +223,21 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     echo ""
     echo "✓ VPN connected successfully!"
 
+    # # Wait a bit for Gluetun to fully configure firewall
+    # sleep 3
+
+    # # Apply additional iptables rules for torrenting (from post-rules.txt)
+    # echo "→ Applying torrent-friendly firewall rules..."
+    # if [ -f "/iptables/post-rules.txt" ]; then
+    #     while IFS= read -r rule; do
+    #         # Skip empty lines and comments
+    #         [[ -z "$rule" || "$rule" =~ ^# ]] && continue
+    #         # Execute the rule
+    #         eval "$rule" 2>/dev/null || echo "  ⚠ Failed to apply rule: $rule"
+    #     done < "/iptables/post-rules.txt"
+    #     echo "  ✓ Post-rules applied"
+    # fi
+
     # Get VPN IP
     sleep 2
     VPN_IP=$(curl -s --max-time 10 https://api.ipify.org 2>/dev/null || echo "unknown")
@@ -244,6 +246,12 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     # Show routing info
     echo "  VPN Interface: tun0"
     echo "  Local networks bypassing VPN: $LOCAL_NETWORKS"
+    
+    # Show firewall rules for debugging
+    echo ""
+    echo "→ Active iptables rules:"
+    iptables -L INPUT -v -n | grep -E "(Chain|tun0|51413)" || echo "  No specific torrent rules found"
+    
     exit 0
 fi
 
