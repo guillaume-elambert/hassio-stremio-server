@@ -14,41 +14,26 @@ hassio_api: true
 
 options:
   web_ui_protocol: https
-  ipaddress: "0.0.0.0"
   auto_server_url: true
   no_cors: true
   casting_disabled: false
-  webui_location: ""
-  ffmpeg_bin: ""
-  ffprobe_bin: ""
-  app_path: ""
-  domain: ""
-  cert_file: ""
-  username: ""
-  password: ""
   disable_caching: false
-  localStorage: ""
+  local_storage: ""
   vpn_enabled: false
   vpn_type: "openvpn"
 
 schema:
   web_ui_protocol: list(http|https)
-  ipaddress: str
   server_url: str?
   auto_server_url: bool
   no_cors: bool
   casting_disabled: bool
-  webui_location: str
-  webui_internal_port: int?
-  ffmpeg_bin: str
-  ffprobe_bin: str
-  app_path: str
-  domain: str
-  cert_file: str
-  username: str
-  password: str
+  domain: str?
+  cert_file: str?
+  username: str?
+  password: str?
   disable_caching: bool
-  localStorage: str
+  local_storage: str
   
   # VPN Configuration
   vpn_enabled: bool
@@ -82,7 +67,6 @@ devices:
 
 privileged:
   - NET_ADMIN
-  - SYS_MODULE
 
 map:
   - media:rw

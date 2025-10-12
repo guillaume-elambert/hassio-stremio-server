@@ -5,7 +5,7 @@ It is based on [stremio docker from tsaridas][stremio-docker].
 
 ## Importing/configuring the default Web UI settings
 
-Stremio's web app stores settings in the browser's local storage. You can pre-configure these settings by editing the `localStorage` option.
+Stremio's web app stores settings in the browser's local storage. You can pre-configure these settings by editing the `local_storage` option.
 To import your actual from [Stremio Web][stremio-web] or [your Web UI][webui], open the developper tools and type in the console the following code to copy your configuration in your clipboard.
 
 ```js

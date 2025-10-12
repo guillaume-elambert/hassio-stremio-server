@@ -79,31 +79,6 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
             fi
         fi
     done
-
-    # Create a function that create a comma sparated list of ports
-    # from a range (e.g. 6881:6889 -> 6881,6882,6883,...,6889)
-    expand_ports() {
-    local input=$1
-    local output=()
-    local IFS=','
-
-    for part in $input; do
-        if [[ $part == *:* ]]; then
-            IFS=':' read -r start end <<< "$part"
-            for ((p=start; p<=end; p++)); do
-                output+=("$p")
-            done
-        else
-            output+=("$part")
-        fi
-    done
-
-    (IFS=','; echo "${output[*]}")
-}
-
-    # CRITICAL: Open firewall for Stremio streaming and torrenting
-    # export FIREWALL_VPN_INPUT_PORTS=$(expand_ports "51413,6881:6889")
-    # export FIREWALL_INPUT_PORTS=$(expand_ports "8080,11470,12470")
     export FIREWALL_OUTBOUND_SUBNETS="$LOCAL_NETWORKS"
     export FIREWALL_DEBUG="$DEBUG_ENABLED"
 

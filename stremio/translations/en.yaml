@@ -4,12 +4,6 @@ configuration:
         name: Web UI Protocol
         description: >
             Protocol for accessing the Stremio Web UI. Can be either 'http' or 'https'.
-    ipaddress:
-        name: IP Address
-        description: >
-            Set this to a valid IPv4 in order to enable https and generate certificates with stremio domain. 
-            If you set this to 0.0.0.0 it will try to automatically get your public ip.
-            Getting the public ip and DNS is not reliable and might need multiple retries. It will not work for IPv6.
     server_url:
         name: Server URL
         description: Manually sets the streaming server URL. This is useful when you want to force a specific URL.
@@ -27,28 +21,6 @@ configuration:
         description: >
             Set to disable casting.
             You should set this to 1 if you're getting SSDP errors in the logs.
-    webui_location:
-        name: WebUI Location
-        description: >
-            Sets the redirect page for web player and automatically sets up streaming server for you when one tries to access server at port 11470 or 12470.
-            Default is https://app.strem.io/shell-v4.4/.
-    webui_internal_port:
-        name: WebUI Internal Port
-        description: >
-            Sets the port inside the docker container for the web player.
-    ffmpeg_bin:
-        name: FFMPEG Bin
-        description: >
-            Set for custom ffmpeg bin path.
-    ffprobe_bin:
-        name: FFPROBE Bin
-        description: >
-            Set for custom ffprobe bin path.
-    app_path:
-        name: App Path
-        description: >
-            Set for custom path for stremio server.
-            Server will always save cache to /root/.stremio-server though so it's only for its config files.
     domain:
         name: Domain
         description: >
@@ -71,7 +43,7 @@ configuration:
         name: Disable Caching
         description: >
             Disable caching for server if set to 1.
-    localStorage:
+    local_storage:
         name: Default Web UI Local Storage
         description: >
             Set the default localStorage for the web UI. Useful for pre-configuring certain settings or addons.
