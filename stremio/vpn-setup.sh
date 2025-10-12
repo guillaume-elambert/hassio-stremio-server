@@ -23,11 +23,14 @@ echo "=================================="
 echo "VPN Setup"
 echo "=================================="
 
+# Convert DEBUG_ENABLED for Gluetun
 if [ -n "$DEBUG_ENABLED" ] && [ "$DEBUG_ENABLED" = "1" ]; then
     DEBUG_ENABLED="on"
+else
+    DEBUG_ENABLED="off"
 fi
 
-# Check if VPN is enabled (exported 0 or 1) from options
+# Check if VPN is enabled
 VPN_ENABLED=${VPN_ENABLED:-0}
 
 if [ "$VPN_ENABLED" = "0" ]; then
@@ -46,6 +49,8 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
 
     # Get docker network
     DOCKER_NETWORK=$(jq -r '.data.docker.address // ""' <<<"$HOST_NETWORK_INFO")
+    DOCKER_GATEWAY=$(jq -r '.data.docker.gateway // ""' <<<"$HOST_NETWORK_INFO")
+    
     if [ -n "$DOCKER_NETWORK" ] && [ "$DOCKER_NETWORK" != "null" ]; then
         LOCAL_NETWORKS="$DOCKER_NETWORK"
     fi
@@ -70,37 +75,88 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
             if [ -z "$LOCAL_NETWORKS" ]; then
                 LOCAL_NETWORKS="$CIDR"
             elif ! grep -q "$CIDR" <<<"$LOCAL_NETWORKS"; then
-                # Check if CIDR already exists in LOCAL_NETWORKS
                 LOCAL_NETWORKS="$LOCAL_NETWORKS,$CIDR"
             fi
         fi
     done
 
+    # Create a function that create a comma sparated list of ports
+    # from a range (e.g. 6881:6889 -> 6881,6882,6883,...,6889)
+    expand_ports() {
+    local input=$1
+    local output=()
+    local IFS=','
+
+    for part in $input; do
+        if [[ $part == *:* ]]; then
+            IFS=':' read -r start end <<< "$part"
+            for ((p=start; p<=end; p++)); do
+                output+=("$p")
+            done
+        else
+            output+=("$part")
+        fi
+    done
+
+    (IFS=','; echo "${output[*]}")
+}
+
     # CRITICAL: Open firewall for Stremio streaming and torrenting
-    # Stremio uses ports 11470 (HTTP) and 12470 (HTTPS) for streaming
-    export FIREWALL_VPN_INPUT_PORTS="8080,11470,12470,51413"
-    export FIREWALL_INPUT_PORTS="8080,11470,12470,51413"
+    # export FIREWALL_VPN_INPUT_PORTS=$(expand_ports "51413,6881:6889")
+    # export FIREWALL_INPUT_PORTS=$(expand_ports "8080,11470,12470")
     export FIREWALL_OUTBOUND_SUBNETS="$LOCAL_NETWORKS"
-    export FIREWALL_DEBUG=$DEBUG_ENABLED
+    export FIREWALL_DEBUG="$DEBUG_ENABLED"
 
     echo "  Local networks: $LOCAL_NETWORKS"
-    echo "  Firewall VPN input ports: 8080,11470,12470,51413"
 fi
 
 # Get VPN configuration from options
 VPN_SERVICE_PROVIDER=$(jq -r '.vpn_service_provider // "custom"' "$CONFIG_PATH")
+VPN_TYPE=$(jq -r '.vpn_type // "openvpn"' "$CONFIG_PATH")
 
 export VPN_SERVICE_PROVIDER
 export VPN_TYPE
 
-if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
-    if [ "$VPN_PORT_FORWARDING" = "1" ]; then
-        VPN_PORT_FORWARDING="on"
-        VPN_PORT_FORWARDING_PROVIDER=$VPN_SERVICE_PROVIDER
+# Handle port forwarding
+if [ "$VPN_PORT_FORWARDING" = "1" ]; then
+    export VPN_PORT_FORWARDING=on
+    
+    # Set provider if not custom
+    if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
+        # Map to Gluetun format
+        case "$VPN_SERVICE_PROVIDER" in
+            "private internet access"|"privateinternetaccess")
+                export VPN_PORT_FORWARDING_PROVIDER="private internet access"
+                export PORT_FORWARD_ONLY=on
+                echo "  ✓ Port forwarding enabled for PIA"
+                ;;
+            "protonvpn")
+                export VPN_PORT_FORWARDING_PROVIDER="protonvpn"
+                echo "  ✓ Port forwarding enabled for ProtonVPN"
+                ;;
+            "privatevpn"|"private vpn")
+                export VPN_PORT_FORWARDING_PROVIDER="privatevpn"
+                echo "  ✓ Port forwarding enabled for PrivateVPN"
+                ;;
+            "perfect privacy"|"perfectprivacy")
+                export VPN_PORT_FORWARDING_PROVIDER="perfect privacy"
+                echo "  ✓ Port forwarding enabled for Perfect Privacy"
+                ;;
+            *)
+                echo "  ⚠ Port forwarding requested but provider may not support it"
+                export VPN_PORT_FORWARDING="off"
+                ;;
+        esac
+    else
+        echo "  ⚠ Port forwarding not supported with custom configs"
+        export VPN_PORT_FORWARDING=off
     fi
+else
+    export VPN_PORT_FORWARDING=off
+fi
 
+if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
     # Using a known provider
-    # Export based on VPN type
     if [ "$VPN_TYPE" = "wireguard" ]; then
         [ -n "$VPN_USERNAME" ] && export WIREGUARD_PRIVATE_KEY="$VPN_USERNAME"
         [ -n "$VPN_PASSWORD" ] && export WIREGUARD_PRESHARED_KEY="$VPN_PASSWORD"
@@ -170,11 +226,7 @@ if [ "$VPN_ENABLED" = "0" ]; then
     exit 0
 fi
 
-if [ "$VPN_PORT_FORWARDING" != "on" ]; then
-    VPN_PORT_FORWARDING="off"
-fi
-
-# Disable pprof to prevent nil pointer dereference
+# Disable pprof
 export PPROF_ENABLED=no
 unset PPROF_HTTP_SERVER_ADDRESS
 
@@ -183,10 +235,8 @@ export HTTPPROXY=off
 export SHADOWSOCKS=off
 export HTTP_CONTROL_SERVER_ADDRESS=""
 
-# DNS settings - use Docker DNS
-# DOCKER_DNS=$(jq -r '.data.docker.dns // "127.0.0.11"' <<<"$HOST_NETWORK_INFO")
+# DNS settings
 export DOT=off
-# export DNS_ADDRESS="$DOCKER_DNS"
 export DNS_ADDRESS=127.0.0.11
 
 # Health check settings
@@ -197,7 +247,7 @@ export HEALTH_SUCCESS_WAIT_DURATION=5s
 # Logging
 export LOG_LEVEL=info
 
-# Updater settings - disable to prevent issues
+# Updater settings
 export UPDATER_PERIOD=0
 
 # Version information
@@ -208,7 +258,7 @@ echo "→ Starting Gluetun VPN..."
 /gluetun-entrypoint 2>&1 | tee /tmp/gluetun.log &
 GLUETUN_PID=$!
 
-# Give it a moment to initialize
+# Give it time to initialize
 sleep 5
 
 # Wait for VPN to connect
@@ -243,7 +293,7 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     VPN_IP=$(curl -s --max-time 10 https://api.ipify.org 2>/dev/null || echo "unknown")
     echo "  Public IP: $VPN_IP"
 
-    # Checkvpn for port forwarding (PIA)
+    # Check for port forwarding
     if [ "$VPN_PORT_FORWARDING" = "on" ]; then
         echo -n "  Waiting for port forwarding"
         for i in {1..30}; do
@@ -254,11 +304,6 @@ if [ "$VPN_CONNECTED" = "1" ]; then
                 if [ -n "$FORWARDED_PORT" ] && [ "$FORWARDED_PORT" != "0" ]; then
                     echo ""
                     echo "  ✓ Port forwarding active: $FORWARDED_PORT"
-                    
-                    # Add forwarded port to firewall
-                    iptables -I INPUT 1 -p tcp --dport "$FORWARDED_PORT" -j ACCEPT 2>/dev/null || true
-                    iptables -I INPUT 1 -p udp --dport "$FORWARDED_PORT" -j ACCEPT 2>/dev/null || true
-                    echo "  ✓ Firewall updated for forwarded port"
                     break
                 fi
             fi
@@ -266,7 +311,7 @@ if [ "$VPN_CONNECTED" = "1" ]; then
         
         if [ -z "$FORWARDED_PORT" ] || [ "$FORWARDED_PORT" = "0" ]; then
             echo ""
-            echo "  ⚠ Port forwarding not available (this is normal for some VPN servers)"
+            echo "  ⚠ Port forwarding not available"
         fi
     fi
 
@@ -275,28 +320,24 @@ if [ "$VPN_CONNECTED" = "1" ]; then
     echo "  Local networks bypassing VPN: $LOCAL_NETWORKS"
     
     # Show firewall rules for debugging
-    echo ""
-    echo "→ Active firewall INPUT rules:"
-    iptables -L INPUT -v -n --line-numbers | head -20
+    if [ "$DEBUG_ENABLED" = "on" ]; then
+        echo ""
+        echo "→ Active firewall INPUT rules (first 20):"
+        iptables -L INPUT -v -n --line-numbers | head -20
+        
+        echo ""
+        echo "→ Active firewall OUTPUT rules (first 20):"
+        iptables -L OUTPUT -v -n --line-numbers | head -20
+    fi
     
     echo ""
     echo "→ Testing connectivity:"
-
-    HOST_INFO=$()
-    HOST_HOSTNAME=$(curl -sSL -H "Authorization: Bearer $SUPERVISOR_TOKEN" http://supervisor/info | jq -r '.data.hostname // ""' || echo "")
-    HOST_PORT=$(curl -sSL -H "Authorization: Bearer $SUPERVISOR_TOKEN" http://supervisor/core/info | jq -r '.data.port // ""' || echo "")
-
-    LOCAL_NETWORK_CONNECTIVITY=$(ping -c 1 -W 2 "$DOCKER_GATEWAY" >/dev/null 2>&1 && echo $?)
-    if [ -n "$HOST_HOSTNAME" ]; then
-        # Check if LOCAL_NETWORK_CONNECTIVITY is set, if not set it to 1 (not connected)
-        LOCAL_NETWORK_CONNECTIVITY=${LOCAL_NETWORK_CONNECTIVITY:-1} && $()
-    fi
-
+    
     # Test local network
-    if ping -c 1 -W 2 "$DOCKER_GATEWAY" >/dev/null 2>&1; then
+    if [ -n "$DOCKER_GATEWAY" ] && ping -c 1 -W 2 "$DOCKER_GATEWAY" >/dev/null 2>&1; then
         echo "  ✓ Local network accessible"
     else
-        echo "  ⚠ Local network test failed"
+        echo "  ⚠ Local network test inconclusive"
     fi
     
     # Test VPN

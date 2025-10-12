@@ -163,10 +163,13 @@ ENV VPN_SERVICE_PROVIDER=pia \
     PGID=
 
 # Install required packages
-RUN apk add --no-cache \
+RUN apk add --no-cache --update \
     bash \
     jq \
-    ipcalc
+    ipcalc \
+    shadow-login \
+    xtables-addons
+
 
 # Copy Gluetun binaries and scripts from the Gluetun image
 COPY --from=gluetun /gluetun /gluetun

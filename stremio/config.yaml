@@ -50,7 +50,7 @@ schema:
   disable_caching: bool
   localStorage: str
   
-  # VPN Configuration (Custom configs only)
+  # VPN Configuration
   vpn_enabled: bool
   vpn_type: list(openvpn|wireguard)?
   vpn_service_provider: list(custom|airvpn|cyberghost|expressvpn|fastestvpn|giganews|hidemyass|ipvanish|ivpn|mullvad|nordvpn|perfect privacy|privado|private internet access|privatevpn|protonvpn|purevpn|slickvpn|surfshark|torguard|vpnsecure|vpn unlimited|vyprvpn|wevpn|windscribe)?
