@@ -35,6 +35,12 @@ done
 
 if [ -n "$CERT_FILE" ]; then 
     export CERT_FILE="/ssl/$CERT_FILE"
+    CONFIG_FOLDER="${APP_PATH:-${HOME}/.stremio-server/}"
+    cp $CERT_FILE $CONFIG_FOLDER
+fi
+
+if [ "$WEB_UI_PROTOCOL" == "https" ] && [ -z "$CERT_FILE" ]; then
+    export IPADDRESS=0.0.0.0
 fi
 
 # Setup VPN, it returns 1 if VPN setup fails, make sure it doesn't stop the script
