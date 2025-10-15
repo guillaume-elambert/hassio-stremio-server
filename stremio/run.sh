@@ -33,6 +33,10 @@ for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
     fi
 done
 
+if [ -n "$CERT_FILE" ]; then 
+    export CERT_FILE="/ssl/$CERT_FILE"
+fi
+
 # Setup VPN, it returns 1 if VPN setup fails, make sure it doesn't stop the script
 ./vpn-setup.sh || true
 

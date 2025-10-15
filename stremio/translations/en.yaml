@@ -32,6 +32,7 @@ configuration:
         description: >
             Set for custom certificate path.
             The server and web player will load the specified certificate.
+            Set only the filename, it will search into your homeassistant `ssl` directory.
     username:
         name: Username
         description: Set for custom username for http simple authentication.
