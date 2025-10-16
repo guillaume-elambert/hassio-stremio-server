@@ -49,6 +49,10 @@ else
     fi
 fi
 
+# Auto redirect to correct protocol
+sed -i '/server {/a \    error_page 497 =301 http://$host:$server_port$request_uri;' /etc/nginx/http.d/default.conf
+sed -i '/server {/a \    error_page 497 =301 https://$host:$server_port$request_uri;' /etc/nginx/https.conf
+
 # Setup VPN, it returns 1 if VPN setup fails, make sure it doesn't stop the script
 ./vpn-setup.sh || true
 
@@ -60,7 +64,14 @@ echo "=================================="
 if [ -n "$DEBUG_ENABLED" ] && [ "$DEBUG_ENABLED" = "1" ]; then
     # Enable verbose logging for Stremio
     export DEBUG="*"
-    export NODE_DEBUG="net,http,http2,tls"
+    #export NODE_DEBUG="net,http,http2,tls"
+else
+    # Disable access logs
+    sed -i 's/access_log \/dev\/stdout;/access_log off;/' /etc/nginx/http.d/default.conf
+    sed -i 's/access_log \/dev\/stdout;/access_log off;/' /etc/nginx/https.conf
+    
+    unset DEBUG
+    unset NODE_DEBUG
 fi
 
 # Handle local_storage option
