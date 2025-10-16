@@ -33,14 +33,20 @@ for opt in $(jq -r 'keys[]' "$CONFIG_PATH"); do
     fi
 done
 
-if [ -n "$CERT_FILE" ]; then 
-    export CERT_FILE="/ssl/$CERT_FILE"
-    CONFIG_FOLDER="${APP_PATH:-${HOME}/.stremio-server/}"
-    cp $CERT_FILE $CONFIG_FOLDER
-fi
-
-if [ "$WEB_UI_PROTOCOL" == "https" ] && [ -z "$CERT_FILE" ]; then
-    export IPADDRESS=0.0.0.0
+if [ "$WEB_UI_PROTOCOL" == "http" ]; then
+    unset IPADDRESS
+    unset CERT_FILE
+    unset KEY_FILE
+else
+    if [ -z "$CERT_FILE" ] || [ -z "$KEY_FILE" ] || [ ! -f "/ssl/$CERT_FILE" ] || [ ! -f "/ssl/$KEY_FILE" ]; then
+        export IPADDRESS=0.0.0.0
+        unset CERT_FILE
+        unset KEY_FILE
+    else
+        unset IPADDRESS
+        CONFIG_FOLDER="${APP_PATH:-${HOME}/.stremio-server/}"
+        cat /ssl/$CERT_FILE /ssl/$KEY_FILE > $CONFIG_FOLDER/$CERT_FILE
+    fi
 fi
 
 # Setup VPN, it returns 1 if VPN setup fails, make sure it doesn't stop the script

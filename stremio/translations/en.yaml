@@ -24,15 +24,22 @@ configuration:
     domain:
         name: Domain
         description: >
-            Set for custom domain for stremio server.
+            Set for custom SSL certificate.
             Server will use the specified domain for the web player and streaming server.
-            This should match the certificate and cannot be applied without specifying CERT_FILE.
+            This requires the cert and key files also be configured.
     cert_file:
         name: Certificate File
         description: >
-            Set for custom certificate path.
+            Set for custom SSL certificate.
             The server and web player will load the specified certificate.
             Set only the filename, it will search into your homeassistant `ssl` directory.
+            This requires the domain and key file also be configured.
+    key_file:
+        name: Certificate private key File
+        description: >
+            Set for custom SSL certificate.
+            Set only the filename, it will search into your homeassistant `ssl` directory.
+            This requires the domain and cert file also be configured.
     username:
         name: Username
         description: Set for custom username for http simple authentication.

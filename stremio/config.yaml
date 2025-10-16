@@ -1,5 +1,5 @@
 ---
-version: 1.0.2
+version: 1.0.3
 name: Stremio Server
 slug: stremio_server
 description: Run Stremio server on Home Assistant OS with hardware acceleration and VPN support
@@ -30,6 +30,7 @@ schema:
   casting_disabled: bool
   domain: str?
   cert_file: str?
+  key_file: str?
   username: str?
   password: str?
   disable_caching: bool
