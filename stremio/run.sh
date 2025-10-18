@@ -2,7 +2,7 @@
 set -e
 
 CONFIG_PATH=${CONFIG_PATH:-"/data/options.json"}
-LOCAL_STORAGE_PATH=${LOCAL_STORAGE_PATH:-"./local_storage.json"}
+LOCAL_STORAGE_PATH=${LOCAL_STORAGE_PATH:-"./localStorage.json"}
 EXCLUDE_OPTIONS=("local_storage" "local_network" "^vpn_.*$")
 
 # Function to check if element is in array
@@ -78,8 +78,33 @@ fi
 LOCAL_STORAGE=$(jq -r '.local_storage // empty' "$CONFIG_PATH")
 if [[ -n "$LOCAL_STORAGE" ]]; then
     echo "$LOCAL_STORAGE" >"$LOCAL_STORAGE_PATH"
-    echo "  ✓ localStorage configuration saved"
+    echo "  ✓ localStorage configuration saved to $(realpath $LOCAL_STORAGE_PATH)"
 fi
+
+# Make container use /config/.stremio-server/ for /root/.stremio-server/ config folder
+VOLUME_CONFIG_DIR="/config/.stremio-server/"
+SERVER_CONFIG_DIR="/root/.stremio-server/"
+
+mkdir -p "$VOLUME_CONFIG_DIR"
+rm -rf "$SERVER_CONFIG_DIR"
+
+ln -sf "$VOLUME_CONFIG_DIR" "/root/"
+
+if [ -n "$AUTO_TRANSCODING_PROFILE" ] && [ "$AUTO_TRANSCODING_PROFILE" == "1" ]; then
+    ( ./setup-server-settings.sh "auto_transcoding" & )
+fi
+
+# Make sure current user has acess to /dev/dri devices
+for dev in /dev/dri/*; do
+    [ -e "$dev" ] || continue
+    gid=$(stat -c %g "$dev")
+    group_name=$(getent group "$gid" | cut -d: -f1)
+    if [ -z "$group_name" ]; then
+        group_name="dri_$gid"
+        addgroup -g "$gid" -S "$group_name" 2>/dev/null || true
+    fi
+    adduser "$(whoami)" "$group_name" 2>/dev/null || true
+done
 
 echo ""
 echo "=================================="

@@ -1,5 +1,5 @@
 ---
-version: 1.0.4
+version: 1.0.5-3
 name: Stremio Server
 slug: stremio_server
 description: Run Stremio server on Home Assistant OS with hardware acceleration and VPN support
@@ -15,6 +15,7 @@ hassio_api: true
 options:
   web_ui_protocol: https
   auto_server_url: true
+  auto_transcoding_profile: true
   no_cors: true
   casting_disabled: false
   disable_caching: false
@@ -26,6 +27,9 @@ schema:
   web_ui_protocol: list(http|https)
   server_url: str?
   auto_server_url: bool
+  auto_transcoding_profile: bool
+  libva_driver_name: str?
+  vaapi_device: str?
   no_cors: bool
   casting_disabled: bool
   domain: str?
@@ -74,3 +78,7 @@ map:
   - share:rw
   - ssl:ro
   - addon_config:rw
+
+environment:
+  LIBVA_DRIVER_NAME: radeonsi
+  VAAPI_DEVICE: /dev/dri/renderD128

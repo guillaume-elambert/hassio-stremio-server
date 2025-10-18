@@ -2,6 +2,8 @@
 set -e
 
 CONFIG_PATH=${CONFIG_PATH:-"/data/options.json"}
+VPN_CONFIG_DIR="/config/vpn"
+mkdir -p "$VPN_CONFIG_DIR"
 
 JQ_VPN_CONFIG=$(jq 'to_entries | map(select(.key | startswith("vpn_"))) | from_entries' "$CONFIG_PATH")
 
@@ -56,12 +58,10 @@ if [ -n "$HOST_NETWORK_INFO" ] && jq . >/dev/null <<<"$HOST_NETWORK_INFO" 2>&1; 
     fi
 
     # Get all interface networks
-    readarray -t IPS < <(jq -c '.data.interfaces[]?.ipv4?.address[]? // empty' <<<"$HOST_NETWORK_INFO")
+    readarray -t IPS < <(jq -r '.data.interfaces[]?.ipv4?.address[]? // empty' <<<"$HOST_NETWORK_INFO")
 
     for IP in "${IPS[@]}"; do
         if [ -n "$IP" ] && [ "$IP" != "null" ]; then
-            # Remove quotes if present
-            IP=$(tr -d '"' <<<"$IP")
 
             # Calculate network CIDR
             NETWORK=$(ipcalc -n "$IP" 2>/dev/null | cut -d= -f2)
@@ -155,8 +155,6 @@ if [ "$VPN_SERVICE_PROVIDER" != "custom" ]; then
     [ -n "$VPN_SERVER_REGIONS" ] && echo "  Regions: $VPN_SERVER_REGIONS"
 else
     # Using custom VPN config
-    VPN_CONFIG_DIR="/config/vpn"
-
     if [ "$VPN_TYPE" = "wireguard" ]; then
         POSSIBLE_FILES=("$VPN_CONFIG_FILENAME" "wg0.conf" "wireguard.conf" "vpn.conf")
     else

@@ -12,6 +12,19 @@ configuration:
         description: >
             When set to 1, the streaming server URL is automatically detected from the browser's URL.
             This is the recommended setting for most users.
+    auto_transcoding_profile:
+        name: Auto Transcoding Profile
+        description: >
+            When enabled, the addon will set the transcoding profile to the first one available.
+            This is usefull to avoid having to set it back each time the addon restarts.
+    libva_driver_name:
+        name: libva Driver name
+        description: >
+            Name of the libva driver to force for Stremio.
+    vaapi_device:
+        name: vaapi devices
+        description:
+            Path to the vaapi device to force for Stremio.
     no_cors:
         name: No CORS
         description: >

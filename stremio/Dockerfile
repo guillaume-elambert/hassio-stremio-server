@@ -166,9 +166,7 @@ ENV VPN_SERVICE_PROVIDER=pia \
 RUN apk add --no-cache --update \
     bash \
     jq \
-    ipcalc \
-    shadow-login \
-    xtables-addons
+    ipcalc
 
 
 # Copy Gluetun binaries and scripts from the Gluetun image
@@ -178,26 +176,20 @@ COPY --from=gluetun /gluetun-entrypoint /gluetun-entrypoint
 RUN apk add --no-cache --update -l wget && \
     apk add --no-cache --update -X "https://dl-cdn.alpinelinux.org/alpine/v3.17/main" openvpn\~2.5 && \
     mv /usr/sbin/openvpn /usr/sbin/openvpn2.5 && \
-    apk del openvpn
-RUN apk add --no-cache --update openvpn ca-certificates iptables unbound tzdata
-RUN mv /usr/sbin/openvpn /usr/sbin/openvpn2.6 && \
+    apk del openvpn && \
+    apk add --no-cache --update openvpn ca-certificates iptables unbound tzdata && \
+    mv /usr/sbin/openvpn /usr/sbin/openvpn2.6 && \
     rm -rf /var/cache/apk/* /etc/unbound/* /usr/sbin/unbound-* /etc/openvpn/*.sh /usr/lib/openvpn/plugins/openvpn-plugin-down-root.so && \
     deluser openvpn || true && \
     deluser unbound || true
 
-# Add Intel media driver only for x86_64
+# Add media driver only for x86_64
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
-    apk add --no-cache intel-media-driver mesa-va-gallium; \
+    apk add --no-cache intel-media-driver mesa-va-gallium mesa-vulkan-ati; \
     fi
 
-# Add AMD support for x86_64
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
-    apk add --no-cache mesa-vulkan-ati || true; \
-    fi
-
-# Ensure video group exists and add root user to it
-RUN addgroup -g 44 video 2>/dev/null || true && \
-    adduser root video 2>/dev/null || true
+RUN rm -rf /root/.stremio-server && \
+    ln -s "/.stremio-server/" "/root/"
 
 # Copy custom startup script
 COPY ./run.sh /srv/stremio-server/run.sh
@@ -207,8 +199,9 @@ RUN chmod +x /srv/stremio-server/run.sh
 COPY ./vpn-setup.sh /srv/stremio-server/vpn-setup.sh
 RUN chmod +x /srv/stremio-server/vpn-setup.sh
 
-# Copy iptables post-rules for Gluetun
-COPY ./post-rules.txt /iptables/post-rules.txt
+# Copy stremio server settings script
+COPY ./setup-server-settings.sh /srv/stremio-server/setup-server-settings.sh
+RUN chmod +x /srv/stremio-server/setup-server-settings.sh
 
 # Clear cache
 RUN rm -rf /var/cache/apk/* && rm -rf /tmp/*
