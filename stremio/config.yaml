@@ -1,5 +1,5 @@
 ---
-version: 1.0.5-3
+version: 1.0.5
 name: Stremio Server
 slug: stremio_server
 description: Run Stremio server on Home Assistant OS with hardware acceleration and VPN support
@@ -78,7 +78,3 @@ map:
   - share:rw
   - ssl:ro
   - addon_config:rw
-
-environment:
-  LIBVA_DRIVER_NAME: radeonsi
-  VAAPI_DEVICE: /dev/dri/renderD128
