@@ -5,6 +5,9 @@ CONFIG_PATH=${CONFIG_PATH:-"/data/options.json"}
 VPN_CONFIG_DIR="/config/vpn"
 mkdir -p "$VPN_CONFIG_DIR"
 
+# Export default gluetun environment variables
+eval "$(cat /gluetun.env)"
+
 JQ_VPN_CONFIG=$(jq 'to_entries | map(select(.key | startswith("vpn_"))) | from_entries' "$CONFIG_PATH")
 
 # Export configuration options as environment variables (VPN config only)
@@ -204,7 +207,8 @@ export PPROF_ENABLED=no
 unset PPROF_HTTP_SERVER_ADDRESS
 
 # Disable HTTP control server and proxies
-export HTTPPROXY=off
+export HTTPPROXY=on
+export HTTPPROXY_LISTENING_ADDRESS=:8888
 export SHADOWSOCKS=off
 export HTTP_CONTROL_SERVER_ADDRESS=""
 
